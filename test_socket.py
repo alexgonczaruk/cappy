@@ -1,4 +1,5 @@
 import socket
+import random
 
 serverIP = "192.168.2.36"
 serverPORT = 8888
@@ -15,4 +16,7 @@ while True:
     message = connectionSocket.recv(1024).decode()
     print("message: ", message)
 
-    connectionSocket.send("hi".encode())
+    distance = 14 + random.random()
+    distance_str = "PI" + str(round(distance, 2))
+
+    connectionSocket.send(distance_str.encode())
