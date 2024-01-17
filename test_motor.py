@@ -29,7 +29,7 @@ def forward(tf):
     GPIO.output(31, False)
     motorl = GPIO.PWM(32, 50)
     motorl.start(0)
-    motorl.ChangeDutyCycle(20)
+    motorl.ChangeDutyCycle(40)
 
     # GPIO.output(36, False)
     # GPIO.output(37, False)
@@ -44,7 +44,7 @@ def reverse(tf):
     GPIO.output(31, False)
     motorl = GPIO.PWM(32, 50)
     motorl.start(0)
-    motorl.ChangeDutyCycle(20)
+    motorl.ChangeDutyCycle(40)
 
     # GPIO.output(37, True)
     # GPIO.output(36, False)
