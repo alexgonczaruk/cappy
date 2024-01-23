@@ -1,8 +1,9 @@
 import socket
 import random
+from test_obstacle_detection import detection
 from math import cos, asin, sqrt, pi
 
-serverIP = "192.168.2.36"
+serverIP = "192.168.2.52"
 serverPORT = 8888
 
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -41,6 +42,10 @@ while True:
         distance_from_phone = distance(current_location_lat, current_location_lon, phone_location_lat, phone_location_lon)
 
         distance_from_phone = "PI:" + str(round(distance_from_phone, 2))
+
+        # FOR NOW KEEPING THE BELOW CODE HERE BECAUSE WE HAVE THE SOCKET HERE AS WELL
+        if detection():
+            connectionSocket.send("ACTION:STOP".encode())
 
         print(distance_from_phone)
         connectionSocket.send(distance_from_phone.encode())

@@ -18,18 +18,18 @@ def init():
     GPIO.setwarnings(False)
     GPIO.setup(29, GPIO.OUT)
     GPIO.setup(31, GPIO.OUT)
-    GPIO.setup(32, GPIO.OUT)
+    GPIO.setup(33, GPIO.OUT)
     
     # GPIO.setup(33, GPIO.OUT)
     # GPIO.setup(36, GPIO.OUT)
     # GPIO.setup(37, GPIO.OUT)
 
 def forward(tf): 
-    GPIO.output(29, False)
+    GPIO.output(29, True)
     GPIO.output(31, False)
-    motorl = GPIO.PWM(32, 50)
+    motorl = GPIO.PWM(33, 50)
     motorl.start(0)
-    motorl.ChangeDutyCycle(40)
+    motorl.ChangeDutyCycle(100)
 
     # GPIO.output(36, False)
     # GPIO.output(37, False)
@@ -40,11 +40,11 @@ def forward(tf):
     time.sleep(tf)
 
 def reverse(tf): 
-    GPIO.output(29, True)
+    GPIO.output(29, False)
     GPIO.output(31, False)
-    motorl = GPIO.PWM(32, 50)
+    motorl = GPIO.PWM(33, 50)
     motorl.start(0)
-    motorl.ChangeDutyCycle(40)
+    motorl.ChangeDutyCycle(100)
 
     # GPIO.output(37, True)
     # GPIO.output(36, False)
