@@ -19,21 +19,27 @@ def read_tfluna():
                 temperature = (temperature/8.0) - 256.0 # temp scaling and offset
                 return distance/100.0,strength,temperature
 
-def distance():
+def detection():
     if ser.isOpen() == False:
         ser.open() # open serial port if not open
 
-    distance,strength,temperature = read_tfluna() # read values
-    print('Distance: {0:2.2f} m, Strength: {1:2.0f} / 65535 (16-bit), Chip Temperature: {2:2.1f} C'.\
-              format(distance,strength,temperature)) # print sample data
+    avg_dist = 0
+    avg_strength = 0
+    WINDOW = 3
 
-    return distance
+    for _ in range(WINDOW):
+        distance,strength,_ = read_tfluna() # read values
+        avg_dist += distance
+        avg_strength += strength
+    
+    avg_dist /= WINDOW
+    avg_strength /= WINDOW
 
-def detection():
-    if distance() < 1:
-        return True
-    else:
-        return False
+
+    print('Distance: {0:2.2f} m, Strength: {1:2.0f} / 65535 (16-bit)'.\
+              format(avg_dist,avg_strength)) # print sample data
+    
+    return avg_dist, avg_strength
 
 ser = serial.Serial("/dev/serial0", 115200,timeout=0) # mini UART serial device
 # if ser.isOpen() == False:

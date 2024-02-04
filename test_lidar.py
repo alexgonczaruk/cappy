@@ -1,7 +1,7 @@
 import serial,time
 import numpy as np
 
-ser = serial.Serial("/dev/serial0", 115200,timeout=0) # mini UART serial device
+ser = serial.Serial("/dev/ttyUSB0", 115200,timeout=0) # mini UART serial device
 
 def read_tfluna_data():
     while True:
@@ -18,10 +18,14 @@ def read_tfluna_data():
                 return distance/100.0,strength,temperature
 
 while True:
+    # print("checking if open")
     if ser.isOpen() == False:
-        ser.open() # open serial port if not open
+        print("opening")
 
+        ser.open() # open serial port if not open
+    # print("already open")
     distance,strength,temperature = read_tfluna_data() # read values
+    # note that when strength < 100, distance = -1. Also, we should probs ignore strengths of under ~1k? maybe 500
     print('Distance: {0:2.2f} m, Strength: {1:2.0f} / 65535 (16-bit), Chip Temperature: {2:2.1f} C'.\
               format(distance,strength,temperature)) # print sample data
     ser.close() # close serial port
