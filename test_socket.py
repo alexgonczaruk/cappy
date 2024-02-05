@@ -4,7 +4,7 @@ import time
 import serial
 import adafruit_gps
 from test_obstacle_detection import detection
-from math import cos, asin, sqrt, pi
+from math import cos, asin, sqrt, pi, radians, atan2, degrees
 
 serverIP = "192.168.2.52"
 serverPORT = 8888
@@ -75,14 +75,14 @@ def distance(lat1, lon1, lat2, lon2):
 
 def calculate_angle_offset(lat1, lon1, lat2, lon2):
     # Convert latitudes and longitudes to radians
-    lat1_rad, lon1_rad = math.radians(lat1), math.radians(lon1)
-    lat2_rad, lon2_rad = math.radians(lat2), math.radians(lon2)
+    lat1_rad, lon1_rad = radians(lat1), radians(lon1)
+    lat2_rad, lon2_rad = radians(lat2), radians(lon2)
 
     # Calculate the angle offset (bearing) using simplified tangent approximation
-    angle_offset = math.atan2(lon2_rad - lon1_rad, lat2_rad - lat1_rad)
+    angle_offset = atan2(lon2_rad - lon1_rad, lat2_rad - lat1_rad)
 
     # Convert angle offset from radians to degrees
-    angle_offset_deg = math.degrees(angle_offset)
+    angle_offset_deg = degrees(angle_offset)
     direction = "NW"
     if lat2>lat1:
         if lon2>lon1:
@@ -143,7 +143,7 @@ while True:
         obstacle_distance, strength = detection()
 
         # pre-screening, may need to adjust strength threshold
-        if obstacle_distance >= 0.2 obstacle_distance <= 5 and strength >= 900:
+        if obstacle_distance >= 0.2 and obstacle_distance <= 5 and strength >= 900:
             connectionSocket.send("ACTION:STOP".encode())
             GLOBAL_OBSTACLE_STOP = True
         
