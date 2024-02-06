@@ -3,8 +3,14 @@ import random
 import time
 import serial
 import adafruit_gps
+import py_qmc5883l
 from test_obstacle_detection import detection
 from math import cos, asin, sqrt, pi, radians, atan2, degrees
+from time import sleep
+
+sensor = py_qmc5883l.QMC5883L()
+sensor.declination = 9.46
+sensor.calibration = [[1.0800920732995762, 0.1737669228645332, 858.6715020334207], [0.1737669228645332, 1.3770028947667214, -884.0944994333294], [0.0, 0.0, 1.0]]
 
 serverIP = "192.168.2.52"
 serverPORT = 8888
@@ -32,17 +38,20 @@ gps.send_command(b'PMTK220,1000')
 
 GLOBAL_OBSTACLE_STOP = False
 
+def get_compass_bearing(direction_to_turn):
+    angle = sensor.get_bearing()        
+    print('Heading Angle = {}°'.format(angle))
+    diff = angle - ((direction_to_turn + 360) % 360)
+    print(f"angle [{angle}] - direction_to_turn [{direction_to_turn}] + 360 % 360 = {diff}")
+
 def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
     for i in range(10):
         gps.update()
 
-        time.sleep(2)
+        time.sleep(1)
         current = time.monotonic()
-        print(f"current time: {current}, last time: {last}")
         if current - last >= 1.0:
             if not gps.has_fix:
-                print(f"Latitude: {gps.latitude} degrees")
-                print(f"Longitude: {gps.longitude} degrees")
                 print(f"gps does not have fix so printing {0}, {0}, {last}, {lat_avg}, {lon_avg}")
                 continue
                 # return 0, 0, last, lat_avg, lon_avg
@@ -54,10 +63,6 @@ def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
                 lat_avg.pop(0)
             if len(lon_avg) > MAX_LIST_SIZE:
                 lon_avg.pop(0)
-
-            print('Latitude: {0:.6f} degrees'.format(sum(lat_avg)/len(lat_avg)))
-            print('Longitude: {0:.6f} degrees'.format(sum(lon_avg)/len(lon_avg)))
-            print(f"returning {last} {lat_avg} {lon_avg}")
             
         return sum(lat_avg)/len(lat_avg), sum(lon_avg)/len(lon_avg), last, lat_avg, lon_avg
 
@@ -109,6 +114,7 @@ def parse_location(content):
 
 while True:
     message = connectionSocket.recv(1024).decode()
+    print(f"Raw content: {message}")
     code, content = message.split(":", 1)
 
     # Obstacle detection case, wait for phone to transmit "ACTION:START"
@@ -123,6 +129,7 @@ while True:
 
     if code == ACTION:
         print(f"Incoming action: {content}")
+        connectionSocket.send("SETUP:SETUP".encode())
     else:
         if lat_avg == []:
             pi_location_lat, pi_location_lon, last, lat_avg, lon_avg = get_rpi_coordinates()
@@ -141,14 +148,18 @@ while True:
 
         # FOR NOW KEEPING THE BELOW CODE HERE BECAUSE WE HAVE THE SOCKET HERE AS WELL
         obstacle_distance, strength = detection()
+        print(f"obstacle_distance: {obstacle_distance}, strength: {strength}")
+
+        # TODO!
+        get_compass_bearing(direction_to_turn)
 
         # pre-screening, may need to adjust strength threshold
-        if obstacle_distance >= 0.2 and obstacle_distance <= 5 and strength >= 900:
+        if obstacle_distance >= 0.2 and obstacle_distance <= 5 and strength >= 900 and False:
             connectionSocket.send("ACTION:STOP".encode())
             GLOBAL_OBSTACLE_STOP = True
         
         # probably should be else. Ideally, we receive one message, then send one message.
         else:
-            print(f"Pi's distance from phone: {distance_from_phone}")
+            print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone}")
             connectionSocket.send(distance_from_phone.encode())
         

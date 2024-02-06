@@ -2,7 +2,7 @@ import serial,time
 import numpy as np
 
 def read_tfluna():
-    ser = serial.Serial("/dev/serial0", 115200,timeout=0) # mini UART serial device
+    ser = serial.Serial("/dev/ttyUSB0", 115200,timeout=0) # mini UART serial device
     if ser.isOpen() == False:
         ser.open() # open serial port if not open
 
