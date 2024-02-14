@@ -12,7 +12,7 @@ sensor = py_qmc5883l.QMC5883L()
 sensor.declination = 9.46
 sensor.calibration = [[1.0800920732995762, 0.1737669228645332, 858.6715020334207], [0.1737669228645332, 1.3770028947667214, -884.0944994333294], [0.0, 0.0, 1.0]]
 
-serverIP = "192.168.2.52"
+serverIP = "192.168.2.36"
 serverPORT = 8888
 
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -29,7 +29,7 @@ COORDINATE = "COORDINATE"
 lat_avg = []
 lon_avg = []
 last = time.monotonic()
-MAX_LIST_SIZE = 20
+MAX_LIST_SIZE = 5
 
 uart = serial.Serial("/dev/serial0", baudrate=9600, timeout=1)
 gps = adafruit_gps.GPS(uart, debug=False)
@@ -45,10 +45,10 @@ def get_compass_bearing(direction_to_turn):
     print(f"angle [{angle}] - direction_to_turn [{direction_to_turn}] + 360 % 360 = {diff}")
 
 def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
-    for i in range(10):
+    for i in range(MAX_LIST_SIZE):
         gps.update()
 
-        time.sleep(1)
+        # time.sleep(1)
         current = time.monotonic()
         if current - last >= 1.0:
             if not gps.has_fix:
@@ -127,9 +127,15 @@ while True:
                 message = connectionSocket.recv(1024).decode()
                 code, content = message.split(":", 1)
 
-    if code == ACTION:
+    # only stop if we hit the stop button. if we hit start twice, dont worry
+    if code == ACTION and content == "STOP":
         print(f"Incoming action: {content}")
         connectionSocket.send("SETUP:SETUP".encode())
+        GLOBAL_OBSTACLE_STOP = True
+    
+    elif code == ACTION and content == "SOCKET IS OPEN":
+        connectionSocket.send("SETUP:SETUP".encode())
+
     else:
         if lat_avg == []:
             pi_location_lat, pi_location_lon, last, lat_avg, lon_avg = get_rpi_coordinates()
@@ -141,25 +147,37 @@ while True:
         phone_location_lat, phone_location_lon = parse_location(content)
 
         distance_from_phone = distance(pi_location_lat, pi_location_lon, phone_location_lat, phone_location_lon)
-        distance_from_phone = "PI:" + str(round(distance_from_phone, 2))
+        distance_from_phone_str = "PI:" + str(round(distance_from_phone, 2))
+
+        # we made it inside the desired range. Lets stop until user tells us to continue
+        if distance_from_phone < 5:
+            print("MADE IT TO USER!")
+            connectionSocket.send(distance_from_phone.encode())
+            GLOBAL_OBSTACLE_STOP = True
 
         # compute direction to turn towards
         direction_to_turn, cardinal_direction = calculate_angle_offset(pi_location_lat, pi_location_lon, phone_location_lat, phone_location_lon)
 
-        # FOR NOW KEEPING THE BELOW CODE HERE BECAUSE WE HAVE THE SOCKET HERE AS WELL
         obstacle_distance, strength = detection()
         print(f"obstacle_distance: {obstacle_distance}, strength: {strength}")
-
-        # TODO!
-        get_compass_bearing(direction_to_turn)
 
         # pre-screening, may need to adjust strength threshold
         if obstacle_distance >= 0.2 and obstacle_distance <= 5 and strength >= 900 and False:
             connectionSocket.send("ACTION:STOP".encode())
             GLOBAL_OBSTACLE_STOP = True
+            continue
+
+        # TODO!
+        get_compass_bearing(direction_to_turn)
+
+        # calculate offset between direction_to_turn and get_compass_bearing
         
-        # probably should be else. Ideally, we receive one message, then send one message.
-        else:
-            print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone}")
-            connectionSocket.send(distance_from_phone.encode())
+        # turn on each individual motor proportional to direction to turn
+        # MOTORS ON HERE
+
+        
+        
+
+        print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone_str}")
+        connectionSocket.send(distance_from_phone_str.encode())
         
