@@ -15,38 +15,41 @@ keyInput = 0
 # 37 - reverse connection, GPIO 26
 # io 23, pin 16
 # reverse is io 26, old stop is io 16, new stop is io 23 pin 16 (1 motor)
+# N1 = Right, N2 = Left
 
 
 def init():
     GPIO.setmode(GPIO.BOARD)
     GPIO.setwarnings(False)
     GPIO.setup(29, GPIO.OUT) # GPIO 5
-    GPIO.setup(22, GPIO.OUT) # GPIO 6
+    GPIO.setup(22, GPIO.OUT) # GPIO 25
     GPIO.setup(32, GPIO.OUT) # GPIO 12, PWM
     
     GPIO.setup(33, GPIO.OUT) # GPIO 13, PWM
     GPIO.setup(36, GPIO.OUT) # GPIO 16
     GPIO.setup(37, GPIO.OUT) # GPIO 26
-
+    
+    # LEFT
     GPIO.setup(16, GPIO.OUT)
     GPIO.output(16, False)
+    # GPIO.setup(36, GPIO.OUT)
+    # GPIO.output(36, False)
+
+    #RIGHT
     GPIO.setup(36, GPIO.OUT)
     GPIO.output(36, False)
-
-    GPIO.setup(31, GPIO.OUT)
-    GPIO.output(31, False)
     GPIO.setup(22, GPIO.OUT)
     GPIO.output(22, False)
 
 def forward(tf): 
     # GPIO.output(22, True)
-    GPIO.output(29, False)
+    GPIO.output(16, True)
     motorl = GPIO.PWM(32, 35) #20 000 is max, 25 IS TIpping point
     motorl.start(0)
     motorl.ChangeDutyCycle(100)
 
-    GPIO.output(37, True)
-    # GPIO.output(36, False)
+    # GPIO.output(37, False)
+    GPIO.output(36, False)
     motorr = GPIO.PWM(33, 35)
     motorr.start(0)
     motorr.ChangeDutyCycle(100)
@@ -54,14 +57,14 @@ def forward(tf):
     time.sleep(tf)
 
 def reverse(tf): 
-    GPIO.output(29, True)
-    GPIO.output(22, False)
+    GPIO.output(16, False)
+    # GPIO.output(22, False)
     motorl = GPIO.PWM(32, 50)
     motorl.start(0)
     motorl.ChangeDutyCycle(100)
 
-    GPIO.output(36, False)
-    GPIO.output(37, False)
+    GPIO.output(36, True)
+    # GPIO.output(37, True)
     motorr = GPIO.PWM(33, 50) # when this was 50, it was going faster
     motorr.start(0)
     motorr.ChangeDutyCycle(100)
