@@ -1,18 +1,16 @@
-import socket
-import random
-import time
-import serial
-import adafruit_gps
-import py_qmc5883l
-from test_obstacle_detection import detection
+import random, serial, socket, sys, termios, time, tty
+import adafruit_gps, py_qmc5883l
+import RPi.GPIO as GPIO
+
 from math import cos, asin, sqrt, pi, radians, atan2, degrees
 from time import sleep
+from test_obstacle_detection import detection
 
 sensor = py_qmc5883l.QMC5883L()
 sensor.declination = 9.46
 sensor.calibration = [[1.0800920732995762, 0.1737669228645332, 858.6715020334207], [0.1737669228645332, 1.3770028947667214, -884.0944994333294], [0.0, 0.0, 1.0]]
 
-serverIP = "192.168.2.36"
+serverIP = "192.168.2.52"
 serverPORT = 8888
 
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -29,7 +27,7 @@ COORDINATE = "COORDINATE"
 lat_avg = []
 lon_avg = []
 last = time.monotonic()
-MAX_LIST_SIZE = 5
+MAX_LIST_SIZE = 3
 
 uart = serial.Serial("/dev/serial0", baudrate=9600, timeout=1)
 gps = adafruit_gps.GPS(uart, debug=False)
@@ -38,11 +36,120 @@ gps.send_command(b'PMTK220,1000')
 
 GLOBAL_OBSTACLE_STOP = False
 
+filedescriptors = termios.tcgetattr(sys.stdin)
+tty.setcbreak(sys.stdin)
+keyInput = 0
+
+# <--- MOTOR FUNCTIONS -->
+def init():
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setwarnings(False)
+    GPIO.setup(22, GPIO.OUT) # GPIO 25
+    GPIO.setup(29, GPIO.OUT) # GPIO 5
+    GPIO.setup(32, GPIO.OUT) # GPIO 12, PWM
+    
+    GPIO.setup(33, GPIO.OUT) # GPIO 13, PWM
+    GPIO.setup(36, GPIO.OUT) # GPIO 16
+    GPIO.setup(37, GPIO.OUT) # GPIO 26
+    
+    # LEFT
+    GPIO.setup(16, GPIO.OUT)
+    GPIO.output(16, False)
+
+    #RIGHT
+    GPIO.setup(36, GPIO.OUT)
+    GPIO.output(36, False)
+
+    # Why do we need this twice, can we remove below line?
+    GPIO.setup(22, GPIO.OUT)
+
+    # Break
+    GPIO.output(22, False)
+    GPIO.output(37, False)
+
+    # Why do we need this twice, can we remove below line?
+    GPIO.output(22, False)
+
+def brake(tf): 
+    GPIO.output(22, True)
+    GPIO.output(37, True)
+    # time.sleep(tf)
+
+
+def forward(tf):
+    # Brake -> False
+    GPIO.output(22, False)
+    GPIO.output(37, False)
+
+    GPIO.output(16, True)
+    motorl = GPIO.PWM(32, 30) #20 000 is max, 26 is tipping point
+    motorl.start(0)
+    motorl.ChangeDutyCycle(100)
+
+    GPIO.output(36, False)
+    motorr = GPIO.PWM(33, 30)
+    motorr.start(0)
+    motorr.ChangeDutyCycle(100)
+
+    # time.sleep(tf)
+
+def reverse(tf):
+    # Brake -> False
+    GPIO.output(22, False)
+    GPIO.output(37, False)
+
+    GPIO.output(16, False)
+    motorl = GPIO.PWM(32, 50)
+    motorl.start(0)
+    motorl.ChangeDutyCycle(100)
+
+    GPIO.output(36, True)
+    motorr = GPIO.PWM(33, 50) # when this was 50, it was going faster
+    motorr.start(0)
+    motorr.ChangeDutyCycle(100)
+
+    time.sleep(tf)
+
+def left(scaling_factor):
+    # Brake -> False
+    GPIO.output(22, False)
+    GPIO.output(37, False)
+
+    GPIO.output(16, True)
+    motorl = GPIO.PWM(32, 35)
+    motorl.start(0)
+    motorl.ChangeDutyCycle(100)
+
+    GPIO.output(36, False)
+    motorr = GPIO.PWM(33, (35 + scaling_factor))
+    motorr.start(0)
+    motorr.ChangeDutyCycle(100)
+
+    # time.sleep(tf)
+
+def right(scaling_factor): 
+    # Brake -> False
+    GPIO.output(22, False)
+    GPIO.output(37, False)
+
+    GPIO.output(16, True)
+    motorl = GPIO.PWM(32, (35 + scaling_factor))
+    motorl.start(0)
+    motorl.ChangeDutyCycle(100)
+
+    GPIO.output(36, False)
+    motorr = GPIO.PWM(33, 35)
+    motorr.start(0)
+    motorr.ChangeDutyCycle(100)
+
+    # time.sleep(tf)
+
 def get_compass_bearing(direction_to_turn):
     angle = sensor.get_bearing()        
     print('Heading Angle = {}°'.format(angle))
     diff = angle - ((direction_to_turn + 360) % 360)
     print(f"angle [{angle}] - direction_to_turn [{direction_to_turn}] + 360 % 360 = {diff}")
+    return diff
 
 def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
     for i in range(MAX_LIST_SIZE):
@@ -111,11 +218,31 @@ def parse_location(content):
 
     return phone_location_lat, phone_location_lon
 
+message = ""
+code = ""
+content = ""
+waitToinitialize = 0
+connectionSocket.setblocking(False)
+
+sleep_time = 0.01
+init()
 
 while True:
-    message = connectionSocket.recv(1024).decode()
-    print(f"Raw content: {message}")
-    code, content = message.split(":", 1)
+
+    try:
+        while waitToinitialize < 2:
+            message = connectionSocket.recv(1024).decode()
+            print(f"Raw content: {message}")
+            code, content = message.split(":", 1)
+
+            print(f"Incoming action: {content}")
+            connectionSocket.send("SETUP:SETUP".encode())
+
+            waitToinitialize = waitToinitialize + 1
+
+    except socket.error as e:
+        print("passing")
+        time.sleep(0.1)
 
     # Obstacle detection case, wait for phone to transmit "ACTION:START"
     if GLOBAL_OBSTACLE_STOP is True:
@@ -123,12 +250,14 @@ while True:
             GLOBAL_OBSTACLE_STOP = False
         else:
             # TURN OFF MOTORS
+            brake(sleep_time)
             while code != ACTION and content != "START":
                 message = connectionSocket.recv(1024).decode()
                 code, content = message.split(":", 1)
 
     # only stop if we hit the stop button. if we hit start twice, dont worry
     if code == ACTION and content == "STOP":
+        brake(sleep_time)
         print(f"Incoming action: {content}")
         connectionSocket.send("SETUP:SETUP".encode())
         GLOBAL_OBSTACLE_STOP = True
@@ -151,6 +280,7 @@ while True:
 
         # we made it inside the desired range. Lets stop until user tells us to continue
         if distance_from_phone < 5:
+            brake(sleep_time)
             print("MADE IT TO USER!")
             connectionSocket.send(distance_from_phone.encode())
             GLOBAL_OBSTACLE_STOP = True
@@ -163,20 +293,30 @@ while True:
 
         # pre-screening, may need to adjust strength threshold
         if obstacle_distance >= 0.2 and obstacle_distance <= 5 and strength >= 900 and False:
+            brake(sleep_time)
             connectionSocket.send("ACTION:STOP".encode())
             GLOBAL_OBSTACLE_STOP = True
             continue
 
         # TODO!
-        get_compass_bearing(direction_to_turn)
+        angle = get_compass_bearing(direction_to_turn)
+        scaling_factor = math.abs(angle)*0.084
 
-        # calculate offset between direction_to_turn and get_compass_bearing
+        # Turn right
+        if angle < -180:
+            right(scaling_factor)
+            # left wheel at 35
+            # right wheel at 35 + scaling_factor
+        else:
+            left(scaling_factor)
+            # right wheel at 35
+            # right wheel at 35 + scaling_factor
+
+
         
         # turn on each individual motor proportional to direction to turn
         # MOTORS ON HERE
-
-        
-        
+        forward(sleep_time)
 
         print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone_str}")
         connectionSocket.send(distance_from_phone_str.encode())

@@ -32,7 +32,7 @@ try:
     while True:
         angle = sensor.get_bearing()       
         print('Heading Angle = {}°'.format(angle))
-        sleep(2)
+        sleep(1)
 
 except KeyboardInterrupt:
     print('\nScript end!')

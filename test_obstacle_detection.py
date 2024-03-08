@@ -41,7 +41,7 @@ def detection():
     
     return avg_dist, avg_strength
 
-ser = serial.Serial("/dev/serial0", 115200,timeout=0) # mini UART serial device
+# ser = serial.Serial("/dev/serial0", 115200,timeout=0) # mini UART serial device
 # if ser.isOpen() == False:
 #    ser.open() # open serial port if not open
 

@@ -44,13 +44,13 @@ def init():
 def forward(tf): 
     # GPIO.output(22, True)
     GPIO.output(16, True)
-    motorl = GPIO.PWM(32, 35) #20 000 is max, 25 IS TIpping point
+    motorl = GPIO.PWM(32, 30) #20 000 is max, 25 IS TIpping point
     motorl.start(0)
     motorl.ChangeDutyCycle(100)
 
     # GPIO.output(37, False)
     GPIO.output(36, False)
-    motorr = GPIO.PWM(33, 35)
+    motorr = GPIO.PWM(33, 30)
     motorr.start(0)
     motorr.ChangeDutyCycle(100)
 

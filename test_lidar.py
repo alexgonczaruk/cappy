@@ -28,6 +28,6 @@ while True:
     # note that when strength < 100, distance = -1. Also, we should probs ignore strengths of under ~1k? maybe 500
     print('Distance: {0:2.2f} m, Strength: {1:2.0f} / 65535 (16-bit), Chip Temperature: {2:2.1f} C'.\
               format(distance,strength,temperature)) # print sample data
-    ser.close() # close serial port
+    # ser.close() # close serial port
    
-    time.sleep(2)
+    time.sleep(0.2)
