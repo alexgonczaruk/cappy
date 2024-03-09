@@ -160,42 +160,17 @@ def get_compass_bearing(direction_to_turn):
     diff = (direction_to_turn - angle)
     print(f"direction_to_turn [{direction_to_turn}] - angle [{angle}] = {diff}")
 
-    # print(f"angle [{angle}] - direction_to_turn [{direction_to_turn}] + 360 % 360 = {diff}")
     return diff
 
-# def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
-#     for i in range(MAX_LIST_SIZE):
-#         gps.update()
-
-#         # time.sleep(1)
-#         current = time.monotonic()
-#         if current - last >= 1.0:
-#             if not gps.has_fix:
-#                 print(f"gps does not have fix so printing {0}, {0}, {last}, {lat_avg}, {lon_avg}")
-#                 continue
-#                 # return 0, 0, last, lat_avg, lon_avg
-
-#             lat_avg.append(gps.latitude)
-#             lon_avg.append(gps.longitude)
-
-#             if len(lat_avg) > MAX_LIST_SIZE:
-#                 lat_avg.pop(0)
-#             if len(lon_avg) > MAX_LIST_SIZE:
-#                 lon_avg.pop(0)
-            
-#         return sum(lat_avg)/len(lat_avg), sum(lon_avg)/len(lon_avg), last, lat_avg, lon_avg
-
 def get_rpi_coordinates(last = time.monotonic()):
-    # for i in range(MAX_LIST_SIZE):
     gps.update()
 
-    # time.sleep(1)
     current = time.monotonic()
     if current - last >= 1.0:
         last = current
         if not gps.has_fix:
             print(f"gps does not have fix so printing {0}, {0}, {last}, {lat_avg}, {lon_avg}")
-            return 50, -81, last
+            return 0, 0, last
 
     lat = gps.latitude if gps.latitude is not None else 0
     lon = gps.longitude if gps.longitude is not None else 0
@@ -232,7 +207,7 @@ def calculate_angle_offset(lat1, lon1, lat2, lon2):
             direction = "SE"
         else:
             direction = "SW"
-    print(angle_offset_deg, direction)
+
     return angle_offset_deg, direction
 
 def parse_location(content):
@@ -270,6 +245,7 @@ def motors_forward(a, b):
 
 while True:
 
+    # make socket non-blocking, ensure we receive first 3 messages before continuing
     try:
         while waitToinitialize < 3 or NotFirstTime:
             message = connectionSocket.recv(1024).decode()
@@ -306,11 +282,13 @@ while True:
         connectionSocket.send("SETUP:SETUP".encode())
         GLOBAL_OBSTACLE_STOP = True
     
+    # ack for setup
     elif code == ACTION and content == "SOCKET IS OPEN":
         connectionSocket.send("SETUP:SETUP".encode())
 
     else:
         
+        # not an action, its coordinate. Get current coordinates and do math to get distance to phone
         if code != ACTION:
             print(f"CODE {code}, content {content}")
             pi_location_lat, pi_location_lon, last = get_rpi_coordinates(last)
@@ -333,6 +311,7 @@ while True:
         # compute direction to turn towards FROM PI TO PHONE
         direction_to_turn, cardinal_direction = calculate_angle_offset(phone_location_lat, phone_location_lon, pi_location_lat, pi_location_lon)
 
+        # obstacle detection
         obstacle_distance, strength = detection()
 
         # pre-screening, may need to adjust strength threshold
@@ -351,7 +330,9 @@ while True:
         scaling_factor_left = 35 + scaling_factor if angle < -10 else 35
         scaling_factor_right = 35 + scaling_factor if angle > 10 else 35
 
-        if scaling_factor_left > 35:
+        if scaling_factor_left == 35:
+            print("straight")
+        elif scaling_factor_left > 35:
             print("turn left")
         else:
             print("turn right")
@@ -359,6 +340,6 @@ while True:
         motors_forward(scaling_factor_left, scaling_factor_right)
         
         print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone_str}")
-        print("="*40)
+        print("="*100)
         connectionSocket.send(distance_from_phone_str.encode())
         
