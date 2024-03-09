@@ -43,6 +43,9 @@ def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
     return sum(lat_avg)/len(lat_avg), sum(lon_avg)/len(lon_avg), last, lat_avg, lon_avg
 
 while True:
+    # while True:
+    #     get_rpi_coordinates()
+    
     gps.update()
 
     current = time.monotonic()

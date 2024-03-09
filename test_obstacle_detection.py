@@ -3,6 +3,7 @@ import numpy as np
 
 def read_tfluna():
     ser = serial.Serial("/dev/ttyUSB0", 115200,timeout=0) # mini UART serial device
+
     if ser.isOpen() == False:
         ser.open() # open serial port if not open
 
@@ -20,6 +21,8 @@ def read_tfluna():
                 return distance/100.0,strength,temperature
 
 def detection():
+    ser = serial.Serial("/dev/ttyUSB0", 115200,timeout=0) # mini UART serial device
+    
     if ser.isOpen() == False:
         ser.open() # open serial port if not open
 
@@ -36,8 +39,8 @@ def detection():
     avg_strength /= WINDOW
 
 
-    print('Distance: {0:2.2f} m, Strength: {1:2.0f} / 65535 (16-bit)'.\
-              format(avg_dist,avg_strength)) # print sample data
+    # print('Distance: {0:2.2f} m, Strength: {1:2.0f} / 65535 (16-bit)'.\
+    #           format(avg_dist,avg_strength)) # print sample data
     
     return avg_dist, avg_strength
 

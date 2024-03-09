@@ -10,7 +10,7 @@ sensor = py_qmc5883l.QMC5883L()
 sensor.declination = 9.46
 sensor.calibration = [[1.0800920732995762, 0.1737669228645332, 858.6715020334207], [0.1737669228645332, 1.3770028947667214, -884.0944994333294], [0.0, 0.0, 1.0]]
 
-serverIP = "192.168.2.52"
+serverIP = "172.20.10.10"
 serverPORT = 8888
 
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -147,31 +147,59 @@ def right(scaling_factor):
 def get_compass_bearing(direction_to_turn):
     angle = sensor.get_bearing()        
     print('Heading Angle = {}°'.format(angle))
-    diff = angle - ((direction_to_turn + 360) % 360)
-    print(f"angle [{angle}] - direction_to_turn [{direction_to_turn}] + 360 % 360 = {diff}")
+    # diff = angle - ((direction_to_turn + 360) % 360)
+    diff = 0
+    # if direction_to_turn > 0:
+    #     diff = (angle + direction_to_turn) % 360
+    #     print(f"angle [{angle}] + direction_to_turn {direction_to_turn}  % 360 = {diff}")
+
+    # else:
+    #     diff = (angle - direction_to_turn) % 360
+    #     print(f"angle [{angle}] - direction_to_turn {direction_to_turn}  % 360 = {diff}")
+
+    diff = (direction_to_turn - angle)
+    print(f"direction_to_turn [{direction_to_turn}] - angle [{angle}] = {diff}")
+
+    # print(f"angle [{angle}] - direction_to_turn [{direction_to_turn}] + 360 % 360 = {diff}")
     return diff
 
-def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
-    for i in range(MAX_LIST_SIZE):
-        gps.update()
+# def get_rpi_coordinates(last = time.monotonic(), lat_avg = [], lon_avg = []):
+#     for i in range(MAX_LIST_SIZE):
+#         gps.update()
 
-        # time.sleep(1)
-        current = time.monotonic()
-        if current - last >= 1.0:
-            if not gps.has_fix:
-                print(f"gps does not have fix so printing {0}, {0}, {last}, {lat_avg}, {lon_avg}")
-                continue
-                # return 0, 0, last, lat_avg, lon_avg
+#         # time.sleep(1)
+#         current = time.monotonic()
+#         if current - last >= 1.0:
+#             if not gps.has_fix:
+#                 print(f"gps does not have fix so printing {0}, {0}, {last}, {lat_avg}, {lon_avg}")
+#                 continue
+#                 # return 0, 0, last, lat_avg, lon_avg
 
-            lat_avg.append(gps.latitude)
-            lon_avg.append(gps.longitude)
+#             lat_avg.append(gps.latitude)
+#             lon_avg.append(gps.longitude)
 
-            if len(lat_avg) > MAX_LIST_SIZE:
-                lat_avg.pop(0)
-            if len(lon_avg) > MAX_LIST_SIZE:
-                lon_avg.pop(0)
+#             if len(lat_avg) > MAX_LIST_SIZE:
+#                 lat_avg.pop(0)
+#             if len(lon_avg) > MAX_LIST_SIZE:
+#                 lon_avg.pop(0)
             
-        return sum(lat_avg)/len(lat_avg), sum(lon_avg)/len(lon_avg), last, lat_avg, lon_avg
+#         return sum(lat_avg)/len(lat_avg), sum(lon_avg)/len(lon_avg), last, lat_avg, lon_avg
+
+def get_rpi_coordinates(last = time.monotonic()):
+    # for i in range(MAX_LIST_SIZE):
+    gps.update()
+
+    # time.sleep(1)
+    current = time.monotonic()
+    if current - last >= 1.0:
+        last = current
+        if not gps.has_fix:
+            print(f"gps does not have fix so printing {0}, {0}, {last}, {lat_avg}, {lon_avg}")
+            return 50, -81, last
+
+    lat = gps.latitude if gps.latitude is not None else 0
+    lon = gps.longitude if gps.longitude is not None else 0
+    return lat, lon, last
 
 # for latitude, if the diff lat2>lat1, the phone is more north. Move north
 # for longitude, if the diff lon2>lon1, the phone is more east. Move east
@@ -204,7 +232,7 @@ def calculate_angle_offset(lat1, lon1, lat2, lon2):
             direction = "SE"
         else:
             direction = "SW"
-
+    print(angle_offset_deg, direction)
     return angle_offset_deg, direction
 
 def parse_location(content):
@@ -227,10 +255,23 @@ connectionSocket.setblocking(False)
 sleep_time = 0.01
 init()
 
+NotFirstTime = False
+
+pi_location_lat = 0
+pi_location_lon = 0
+
+phone_location_lat = 0
+phone_location_lon = 0
+distance_from_phone = 1000
+distance_from_phone_str = "PI:1000"
+
+def motors_forward(a, b):
+    return
+
 while True:
 
     try:
-        while waitToinitialize < 2:
+        while waitToinitialize < 3 or NotFirstTime:
             message = connectionSocket.recv(1024).decode()
             print(f"Raw content: {message}")
             code, content = message.split(":", 1)
@@ -239,6 +280,7 @@ while True:
             connectionSocket.send("SETUP:SETUP".encode())
 
             waitToinitialize = waitToinitialize + 1
+            NotFirstTime = True
 
     except socket.error as e:
         print("passing")
@@ -251,6 +293,7 @@ while True:
         else:
             # TURN OFF MOTORS
             brake(sleep_time)
+            print("Motors: Brake")
             while code != ACTION and content != "START":
                 message = connectionSocket.recv(1024).decode()
                 code, content = message.split(":", 1)
@@ -258,6 +301,7 @@ while True:
     # only stop if we hit the stop button. if we hit start twice, dont worry
     if code == ACTION and content == "STOP":
         brake(sleep_time)
+        print("Motors: Brake")
         print(f"Incoming action: {content}")
         connectionSocket.send("SETUP:SETUP".encode())
         GLOBAL_OBSTACLE_STOP = True
@@ -266,58 +310,55 @@ while True:
         connectionSocket.send("SETUP:SETUP".encode())
 
     else:
-        if lat_avg == []:
-            pi_location_lat, pi_location_lon, last, lat_avg, lon_avg = get_rpi_coordinates()
-        else:
-            pi_location_lat, pi_location_lon, last, lat_avg, lon_avg = get_rpi_coordinates(last, lat_avg, lon_avg)
+        
+        if code != ACTION:
+            print(f"CODE {code}, content {content}")
+            pi_location_lat, pi_location_lon, last = get_rpi_coordinates(last)
 
-        print(f"pi lat: {pi_location_lat}, pi lon: {pi_location_lon}")
+            print(f"pi lat: {pi_location_lat}, pi lon: {pi_location_lon}")
 
-        phone_location_lat, phone_location_lon = parse_location(content)
+            phone_location_lat, phone_location_lon = parse_location(content)
 
-        distance_from_phone = distance(pi_location_lat, pi_location_lon, phone_location_lat, phone_location_lon)
-        distance_from_phone_str = "PI:" + str(round(distance_from_phone, 2))
+            distance_from_phone = distance(pi_location_lat, pi_location_lon, phone_location_lat, phone_location_lon)
+            distance_from_phone_str = "PI:" + str(round(distance_from_phone, 2))
 
         # we made it inside the desired range. Lets stop until user tells us to continue
         if distance_from_phone < 5:
             brake(sleep_time)
+            print("Motors: Brake")
             print("MADE IT TO USER!")
             connectionSocket.send(distance_from_phone.encode())
             GLOBAL_OBSTACLE_STOP = True
 
-        # compute direction to turn towards
-        direction_to_turn, cardinal_direction = calculate_angle_offset(pi_location_lat, pi_location_lon, phone_location_lat, phone_location_lon)
+        # compute direction to turn towards FROM PI TO PHONE
+        direction_to_turn, cardinal_direction = calculate_angle_offset(phone_location_lat, phone_location_lon, pi_location_lat, pi_location_lon)
 
         obstacle_distance, strength = detection()
-        print(f"obstacle_distance: {obstacle_distance}, strength: {strength}")
 
         # pre-screening, may need to adjust strength threshold
         if obstacle_distance >= 0.2 and obstacle_distance <= 5 and strength >= 900 and False:
             brake(sleep_time)
+            print("Motors: Brake")
             connectionSocket.send("ACTION:STOP".encode())
             GLOBAL_OBSTACLE_STOP = True
             continue
 
-        # TODO!
+        # calculate angle to turn
         angle = get_compass_bearing(direction_to_turn)
-        scaling_factor = math.abs(angle)*0.084
+        scaling_factor = abs(angle)*0.084
 
-        # Turn right
-        if angle < -180:
-            right(scaling_factor)
-            # left wheel at 35
-            # right wheel at 35 + scaling_factor
+        # threshold for control
+        scaling_factor_left = 35 + scaling_factor if angle < -10 else 35
+        scaling_factor_right = 35 + scaling_factor if angle > 10 else 35
+
+        if scaling_factor_left > 35:
+            print("turn left")
         else:
-            left(scaling_factor)
-            # right wheel at 35
-            # right wheel at 35 + scaling_factor
+            print("turn right")
 
-
+        motors_forward(scaling_factor_left, scaling_factor_right)
         
-        # turn on each individual motor proportional to direction to turn
-        # MOTORS ON HERE
-        forward(sleep_time)
-
         print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone_str}")
+        print("="*40)
         connectionSocket.send(distance_from_phone_str.encode())
         
