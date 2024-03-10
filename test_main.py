@@ -241,6 +241,8 @@ phone_location_lon = 0
 distance_from_phone = 1000
 distance_from_phone_str = "PI:1000"
 
+ANGLE = 0
+
 def motors_forward(power_left, power_right):
     GPIO.output(22, False)
     GPIO.output(37, False)
@@ -336,12 +338,11 @@ while True:
             continue
 
         # calculate angle to turn
-        angle = get_compass_bearing(direction_to_turn)
-        scaling_factor = abs(angle)*0.084
+        scaling_factor = abs(ANGLE - direction_to_turn)*0.084
 
         # threshold for control
-        scaling_factor_left = 35 + scaling_factor if angle < -10 else 35
-        scaling_factor_right = 35 + scaling_factor if angle > 10 else 35
+        scaling_factor_left = 35 + scaling_factor if (ANGLE - direction_to_turn) > 10 else 35
+        scaling_factor_right = 35 + scaling_factor if (ANGLE - direction_to_turn) < -10 else 35
 
         if scaling_factor_left == 35:
             print("straight")
@@ -351,6 +352,8 @@ while True:
             print("turn right")
 
         motors_forward(scaling_factor_left, scaling_factor_right)
+
+        ANGLE = direction_to_turn
         
         print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone_str}")
         print("="*100)
