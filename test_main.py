@@ -11,7 +11,7 @@ sensor.declination = 9.46
 # sensor.calibration = [[1.0800920732995762, 0.1737669228645332, 858.6715020334207], [0.1737669228645332, 1.3770028947667214, -884.0944994333294], [0.0, 0.0, 1.0]]
 sensor.calibration = [[ 1.08802835, -0.0763318563, -409.867226], [-0.0763318563,  1.06618950, -394.741495], [ 0.00000000, 0.00000000, 1.00000000]]
 
-serverIP = "172.20.10.10" # Shehan's hotspot
+serverIP = "192.168.2.36" # Shehan's hotspot
 serverPORT = 8888
 
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

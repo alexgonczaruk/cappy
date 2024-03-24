@@ -6,10 +6,10 @@ from math import cos, asin, sqrt, pi, radians, atan2, degrees
 from time import sleep
 from test_obstacle_detection import detection
 
-sensor = py_qmc5883l.QMC5883L()
-sensor.declination = 9.46
+# sensor = py_qm/c5883l.QMC5883L()
+# sensor.declination = 9.46
 # sensor.calibration = [[1.0800920732995762, 0.1737669228645332, 858.6715020334207], [0.1737669228645332, 1.3770028947667214, -884.0944994333294], [0.0, 0.0, 1.0]]
-sensor.calibration = [[ 1.08802835, -0.0763318563, -409.867226], [-0.0763318563,  1.06618950, -394.741495], [ 0.00000000, 0.00000000, 1.00000000]]
+# sensor.calibration = [[ 1.08802835, -0.0763318563, -409.867226], [-0.0763318563,  1.06618950, -394.741495], [ 0.00000000, 0.00000000, 1.00000000]]
 
 serverIP = "192.168.2.36" # Shehan's hotspot
 serverPORT = 8888
@@ -145,23 +145,23 @@ def right(scaling_factor):
 
     # time.sleep(tf)
 
-def get_compass_bearing(direction_to_turn):
-    angle = sensor.get_bearing()        
-    print('Heading Angle = {}°'.format(angle))
-    # diff = angle - ((direction_to_turn + 360) % 360)
-    diff = 0
-    # if direction_to_turn > 0:
-    #     diff = (angle + direction_to_turn) % 360
-    #     print(f"angle [{angle}] + direction_to_turn {direction_to_turn}  % 360 = {diff}")
+# def get_compass_bearing(direction_to_turn):
+#     angle = sensor.get_bearing()        
+#     print('Heading Angle = {}°'.format(angle))
+#     # diff = angle - ((direction_to_turn + 360) % 360)
+#     diff = 0
+#     # if direction_to_turn > 0:
+#     #     diff = (angle + direction_to_turn) % 360
+#     #     print(f"angle [{angle}] + direction_to_turn {direction_to_turn}  % 360 = {diff}")
 
-    # else:
-    #     diff = (angle - direction_to_turn) % 360
-    #     print(f"angle [{angle}] - direction_to_turn {direction_to_turn}  % 360 = {diff}")
+#     # else:
+#     #     diff = (angle - direction_to_turn) % 360
+#     #     print(f"angle [{angle}] - direction_to_turn {direction_to_turn}  % 360 = {diff}")
 
-    diff = (direction_to_turn - angle)
-    print(f"direction_to_turn [{direction_to_turn}] - angle [{angle}] = {diff}")
+#     diff = (direction_to_turn - angle)
+#     print(f"direction_to_turn [{direction_to_turn}] - angle [{angle}] = {diff}")
 
-    return diff
+#     return diff
 
 def get_rpi_coordinates(last = time.monotonic()):
     gps.update()
@@ -171,7 +171,7 @@ def get_rpi_coordinates(last = time.monotonic()):
         last = current
         if not gps.has_fix:
             print(f"gps does not have fix so printing {0}, {0}, {last}, {lat_avg}, {lon_avg}")
-            return 0, 0, last
+            return 43.4766059, -80.5383448, last
 
     lat = gps.latitude if gps.latitude is not None else 0
     lon = gps.longitude if gps.longitude is not None else 0
@@ -214,13 +214,16 @@ def calculate_angle_offset(lat1, lon1, lat2, lon2):
 def parse_location(content):
 
     # Parse the phone's coordinates
-    phone_location = content.split(", ")
-    phone_location_lat = float(phone_location[0])
-    phone_location_lon = float(phone_location[1])
+    try:
+        phone_location = content.split(", ")
+        phone_location_lat = float(phone_location[0])
+        phone_location_lon = float(phone_location[1])
 
-    print(f"Coordinates: {phone_location_lat}, {phone_location_lon}")
+        print(f"Coordinates: {phone_location_lat}, {phone_location_lon}")
 
-    return phone_location_lat, phone_location_lon
+        return phone_location_lat, phone_location_lon
+    except:
+        return 0, 0
 
 message = ""
 code = ""
@@ -276,84 +279,23 @@ while True:
         print("passing")
         time.sleep(0.1)
 
-    # Obstacle detection case, wait for phone to transmit "ACTION:START"
-    if GLOBAL_OBSTACLE_STOP is True:
-        if code == ACTION and content == "START":
-            GLOBAL_OBSTACLE_STOP = False
-        else:
-            # TURN OFF MOTORS
-            brake(sleep_time)
-            print("Motors: Brake")
-            while code != ACTION and content != "START":
-                message = connectionSocket.recv(1024).decode()
-                code, content = message.split(":", 1)
-
-    # only stop if we hit the stop button. if we hit start twice, dont worry
-    if code == ACTION and content == "STOP":
-        brake(sleep_time)
-        print("Motors: Brake")
-        print(f"Incoming action: {content}")
-        connectionSocket.send("SETUP:SETUP".encode())
-        GLOBAL_OBSTACLE_STOP = True
-    
-    # ack for setup
-    elif code == ACTION and content == "SOCKET IS OPEN":
-        connectionSocket.send("SETUP:SETUP".encode())
-
-    else:
-        
-        # not an action, its coordinate. Get current coordinates and do math to get distance to phone
-        if code != ACTION:
-            print(f"CODE {code}, content {content}")
-            pi_location_lat, pi_location_lon, last = get_rpi_coordinates(last)
-
-            print(f"pi lat: {pi_location_lat}, pi lon: {pi_location_lon}")
-
-            phone_location_lat, phone_location_lon = parse_location(content)
-
-            distance_from_phone = distance(pi_location_lat, pi_location_lon, phone_location_lat, phone_location_lon)
-            distance_from_phone_str = "PI:" + str(round(distance_from_phone, 2))
-
-        # we made it inside the desired range. Lets stop until user tells us to continue
-        if distance_from_phone < 5:
-            brake(sleep_time)
-            print("Motors: Brake")
-            print("MADE IT TO USER!")
-            connectionSocket.send(distance_from_phone.encode())
-            GLOBAL_OBSTACLE_STOP = True
-
-        # compute direction to turn towards FROM PI TO PHONE
-        direction_to_turn, cardinal_direction = calculate_angle_offset(phone_location_lat, phone_location_lon, pi_location_lat, pi_location_lon)
-
         # obstacle detection
         obstacle_distance, strength = detection()
 
         # pre-screening, may need to adjust strength threshold
-        if obstacle_distance >= 0.2 and obstacle_distance <= 5 and strength >= 900 and False:
+        if obstacle_distance >= 0.2 and obstacle_distance <= 2 and strength >= 900:
             brake(sleep_time)
             print("Motors: Brake")
-            connectionSocket.send("ACTION:STOP".encode())
+
+            while True:
+                connectionSocket.send("ACTION:STOP".encode())
+                time.sleep(0.1)
             GLOBAL_OBSTACLE_STOP = True
             continue
 
-        # calculate angle to turn
-        angle = get_compass_bearing(direction_to_turn)
-        scaling_factor = abs(angle)*0.084
-
-        # threshold for control
-        scaling_factor_left = 35 + scaling_factor if angle < -10 else 35
-        scaling_factor_right = 35 + scaling_factor if angle > 10 else 35
-
-        if scaling_factor_left == 35:
-            print("straight")
-        elif scaling_factor_left > 35:
-            print("turn left")
-        else:
-            print("turn right")
-
-        # motors_forward(scaling_factor_left, scaling_factor_right)
-        
+       
         print(f"LAST PRINT: Pi's distance from phone: {distance_from_phone_str}")
         print("="*100)
-        connectionSocket.send(distance_from_phone_str.encode())
+        test = 5
+        connectionSocket.send("PI:5".encode())
         

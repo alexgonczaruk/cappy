@@ -6,52 +6,47 @@ tty.setcbreak(sys.stdin)
 keyInput = 0
 
 def init():
+    # White = Reverse
+    # Blue = Stop
+
     GPIO.setmode(GPIO.BOARD)
     GPIO.setwarnings(False)
-    GPIO.setup(22, GPIO.OUT) # GPIO 25
-    GPIO.setup(29, GPIO.OUT) # GPIO 5
-    GPIO.setup(32, GPIO.OUT) # GPIO 12, PWM
-    
-    GPIO.setup(33, GPIO.OUT) # GPIO 13, PWM
-    GPIO.setup(36, GPIO.OUT) # GPIO 16
-    GPIO.setup(37, GPIO.OUT) # GPIO 26
-    
+
+    GPIO.setup(32, GPIO.OUT) # IO 12 = PWM Left
+    GPIO.setup(38, GPIO.OUT) # IO 20 = Reverse Left
+    GPIO.setup(40, GPIO.OUT) # IO 21 = Break Left
+
+    GPIO.setup(33, GPIO.OUT) # IO 13 = PWM Right
+    GPIO.setup(16, GPIO.OUT) # IO 23 = Right Reverse
+    GPIO.setup(37, GPIO.OUT) # IO 26 = Break Right
+
     # LEFT
-    GPIO.setup(16, GPIO.OUT)
-    GPIO.output(16, False)
+    GPIO.output(38, False)
 
     #RIGHT
-    GPIO.setup(36, GPIO.OUT)
-    GPIO.output(36, False)
-
-    # Why do we need this twice, can we remove below line?
-    GPIO.setup(22, GPIO.OUT)
+    GPIO.output(16, False)
 
     # Break
-    GPIO.output(22, False)
+    GPIO.output(40, False)
     GPIO.output(37, False)
 
-    # Why do we need this twice, can we remove below line?
-    GPIO.output(22, False)
-
 def brake(tf): 
-    GPIO.output(22, True)
+    GPIO.output(40, True)
     GPIO.output(37, True)
     time.sleep(tf)
 
 
 def forward(tf): 
     # Brake -> False
-    GPIO.output(22, False)
+    GPIO.output(40, False)
     GPIO.output(37, False)
 
-    GPIO.output(16, True)
-    motorl = GPIO.PWM(32, 30) #20 000 is max, 26 is tipping point
+    GPIO.output(38, True)
+    motorl = GPIO.PWM(32, 30) # 20000 is max, 26 is tipping point
     motorl.start(0)
     motorl.ChangeDutyCycle(100)
 
-    # GPIO.output(37, False)
-    GPIO.output(36, False)
+    GPIO.output(16, False)
     motorr = GPIO.PWM(33, 30)
     motorr.start(0)
     motorr.ChangeDutyCycle(100)
@@ -60,15 +55,15 @@ def forward(tf):
 
 def reverse(tf):
     # Brake -> False
-    GPIO.output(22, False)
+    GPIO.output(40, False)
     GPIO.output(37, False)
 
-    GPIO.output(16, False)
+    GPIO.output(38, False)
     motorl = GPIO.PWM(32, 50)
     motorl.start(0)
     motorl.ChangeDutyCycle(100)
 
-    GPIO.output(36, True)
+    GPIO.output(16, True)
     motorr = GPIO.PWM(33, 50) # when this was 50, it was going faster
     motorr.start(0)
     motorr.ChangeDutyCycle(100)
@@ -77,10 +72,10 @@ def reverse(tf):
 
 def left(tf):
     # Brake -> False
-    GPIO.output(22, False)
+    GPIO.output(40, False)
     GPIO.output(37, False)
 
-    GPIO.output(16, True)
+    GPIO.output(38, True)
     motorl = GPIO.PWM(32, 35) #20 000 is max, 25 IS TIpping point
     motorl.start(0)
     motorl.ChangeDutyCycle(100)
@@ -89,10 +84,10 @@ def left(tf):
 
 def right(tf): 
     # Brake -> False
-    GPIO.output(22, False)
+    GPIO.output(40, False)
     GPIO.output(37, False)
 
-    GPIO.output(36, False)
+    GPIO.output(16, False)
     motorr = GPIO.PWM(33, 35)
     motorr.start(0)
     motorr.ChangeDutyCycle(100)
